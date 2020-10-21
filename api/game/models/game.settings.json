@@ -41,6 +41,11 @@
     "rating": {
       "type": "enumeration",
       "enum": [
+        "LIVRE",
+        "BR0",
+        "BR10",
+        "BR12",
+        "BR14",
         "FREE",
         "pegi3",
         "pegi7",
