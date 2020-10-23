@@ -7,7 +7,7 @@
 
 const axios = require("axios");
 const slugify = require("slugify");
-const qs = require('querystring');
+const qs = require("querystring");
 
 function Exception(e) {
   return { e, data: e.data && e.data.errors && e.data.errors };
@@ -36,7 +36,7 @@ async function getGameInfo(slug) {
             .getAttribute("xlink:href")
             .replace(/_/g, "")
             .replace(/[^\w-]+/g, "")
-        : "FREE",
+        : "BR0",
       short_description: description.textContent.trim().slice(0, 160),
       description: description.innerHTML,
     };
@@ -56,37 +56,39 @@ async function create(name, entityName) {
   if (!item) {
     return await strapi.services[entityName].create({
       name,
-      slug: slugify(name, { lower: true }),
+      slug: slugify(name, { strict: true, lower: true }),
     });
   }
 }
 
 async function createManyToManyData(products) {
-  const developers = {};
-  const publishers = {};
-  const categories = {};
-  const platforms = {};
+  const developers = new Set();
+  const publishers = new Set();
+  const categories = new Set();
+  const platforms = new Set();
 
   products.forEach((product) => {
     const { developer, publisher, genres, supportedOperatingSystems } = product;
 
-    genres &&
-      genres.forEach((item) => {
-        categories[item] = true;
-      });
-    supportedOperatingSystems &&
-      supportedOperatingSystems.forEach((item) => {
-        platforms[item] = true;
-      });
-    developers[developer] = true;
-    publishers[publisher] = true;
+    genres.forEach((item) => {
+      categories.add(item);
+    });
+
+    supportedOperatingSystems.forEach((item) => {
+      platforms.add(item);
+    });
+
+    developers.add(developer);
+    publishers.add(publisher);
   });
 
+  const createCall = (set, entityName) => Array.from(set).map((name) => create(name, entityName));
+
   return Promise.all([
-    ...Object.keys(developers).map((name) => create(name, "developer")),
-    ...Object.keys(publishers).map((name) => create(name, "publisher")),
-    ...Object.keys(categories).map((name) => create(name, "category")),
-    ...Object.keys(platforms).map((name) => create(name, "platform")),
+    ...createCall(developers, "developer"),
+    ...createCall(publishers, "publisher"),
+    ...createCall(categories, "category"),
+    ...createCall(platforms, "platform"),
   ]);
 }
 
@@ -165,9 +167,9 @@ async function createGames(products) {
 module.exports = {
   populate: async (params) => {
     try {
-
-
-      const gogApiUrl = `https://www.gog.com/games/ajax/filtered?mediaType=game&${qs.stringify(params)}`;
+      const gogApiUrl = `https://www.gog.com/games/ajax/filtered?mediaType=game&${qs.stringify(
+        params
+      )}`;
 
       const {
         data: { products },
@@ -175,10 +177,8 @@ module.exports = {
 
       await createManyToManyData(products);
       await createGames(products);
-
     } catch (e) {
       console.log("populate", Exception(e));
     }
-
   },
 };
